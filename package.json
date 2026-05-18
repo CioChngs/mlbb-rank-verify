@@ -1,12 +1,13 @@
 {
   "name": "mlbb-discord-bot",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "MLBB rank and lane role auto-assigner for Discord",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "discord.js": "^14.15.0"
+    "discord.js": "^14.15.0",
+    "mongodb": "^6.8.0"
   }
 }
