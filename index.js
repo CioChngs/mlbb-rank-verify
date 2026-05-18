@@ -1,5 +1,8 @@
 const { Client, GatewayIntentBits, Partials } = require("discord.js");
-const config = require("./config.json");
+const config = {
+  token: process.env.BOT_TOKEN,
+  listenChannelName: process.env.CHANNEL_NAME || "mlbb-rank-verify"
+};
 
 const client = new Client({
   intents: [
