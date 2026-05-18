@@ -15,7 +15,10 @@ const config = {
  
 let db;
 async function connectDB() {
-  const client = new MongoClient(config.mongoUri);
+  const client = new MongoClient(config.mongoUri, {
+  tls: true,
+  tlsAllowInvalidCertificates: true,
+});
   await client.connect();
   db = client.db("mlbb_bot");
   console.log("✅ Connected to MongoDB");
