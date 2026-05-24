@@ -363,7 +363,8 @@ client.on("messageCreate", async (message) => {
     await channel.send({ content: `<@${message.author.id}>`, embeds: [embed] });
  
     // ── STEP 11: Log ──
-    const logChannel = guild.channels.cache.find((c) => c.name === config.logChannelName);
+    try {
+      const logChannel = guild.channels.cache.find((c) => c.name === config.logChannelName);
     if (logChannel) {
       const logFields = [
         { name: "Discord",      value: `<@${message.author.id}> (${message.author.tag})`, inline: false },
@@ -381,12 +382,20 @@ client.on("messageCreate", async (message) => {
           .addFields(logFields)
           .setTimestamp()
       ]});
+      }
+    } catch (logErr) {
+      console.error("Log channel error:", logErr.message);
     }
  
   } catch (err) {
-    console.error("Error:", err);
-    await channel.send(`<@${message.author.id}> ⚠️ Something went wrong. Make sure I have **Manage Roles** permission!`);
+    console.error("Error:", err.message);
+    channel.send(`<@${message.author.id}> ⚠️ Something went wrong. Make sure I have **Manage Roles** permission!`).catch(() => {});
   }
+});
+ 
+// ─── GLOBAL ERROR HANDLER ──────────────────────────────────────────────────────
+process.on("unhandledRejection", (err) => {
+  console.error("Unhandled rejection:", err.message);
 });
  
 // ─── ADMIN COMMANDS ────────────────────────────────────────────────────────────
