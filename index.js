@@ -360,7 +360,7 @@ client.on("messageCreate", async (message) => {
       .setTimestamp()
       .setFooter({ text: "MLBB Role Bot" });
  
-    await message.reply({ embeds: [embed] });
+    await channel.send({ content: `<@${message.author.id}>`, embeds: [embed] });
  
     // ── STEP 11: Log ──
     const logChannel = guild.channels.cache.find((c) => c.name === config.logChannelName);
@@ -385,7 +385,7 @@ client.on("messageCreate", async (message) => {
  
   } catch (err) {
     console.error("Error:", err);
-    await message.reply("⚠️ Something went wrong. Make sure I have **Manage Roles** permission!");
+    await channel.send(`<@${message.author.id}> ⚠️ Something went wrong. Make sure I have **Manage Roles** permission!`);
   }
 });
  
