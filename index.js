@@ -65,6 +65,27 @@ const MYTHIC_TIERS = [
   { min: 0,   max: 24,       role: "Mythic",            color: 0x9B59B6, order: 7  },
 ];
  
+// Extra tiers for Mythical Immortal players only (100+ stars)
+const IMMORTAL_TIERS = [
+  { min: 350, max: Infinity, role: "ELITE",    color: 0x00FFFF },
+  { min: 200, max: 349,      role: "GOLD",     color: 0xFFD700 },
+  { min: 100, max: 199,      role: "IMMORTAL", color: 0xFF4444 },
+];
+ 
+const ALL_IMMORTAL_TIER_ROLES = ["IMMORTAL", "GOLD", "ELITE"];
+ 
+function getImmortalTier(stars) {
+  if (stars === null || stars === undefined) return null;
+  return IMMORTAL_TIERS.find((t) => stars >= t.min && stars <= t.max) || null;
+}
+ 
+async function removeImmortalTierRoles(member) {
+  for (const roleName of ALL_IMMORTAL_TIER_ROLES) {
+    const role = member.roles.cache.find((r) => r.name === roleName);
+    if (role) await member.roles.remove(role);
+  }
+}
+ 
 const NORMAL_RANKS = [
   { keywords: ["legend"],      role: "Legend",      color: 0x3498DB, order: 6 },
   { keywords: ["epic"],        role: "Epic",         color: 0x8E44AD, order: 5 },
@@ -328,6 +349,14 @@ client.on("messageCreate", async (message) => {
  
     const starsNum = stars ? parseInt(stars) : null;
  
+    // Assign IMMORTAL tier role if applicable
+    await removeImmortalTierRoles(member);
+    const immortalTier = getImmortalTier(starsNum);
+    if (immortalTier) {
+      const tierRole = await getOrCreateRole(guild, immortalTier.role, immortalTier.color);
+      await member.roles.add(tierRole);
+    }
+ 
     // ── STEP 9: Save to MongoDB ──
     await savePlayer({
       discordId:    message.author.id,
@@ -481,6 +510,49 @@ async function handleCommand(message, member, guild, channel, user, content) {
         )
         .setTimestamp()
     ]});
+  }
+ 
+  // ── !assigntiers (migration for existing players) ──
+  if (command === "assigntiers") {
+    if (!isAdmin(member)) return message.reply("❌ You don't have permission to use this command.");
+ 
+    const players = await getAllPlayers();
+    if (players.length === 0) return message.reply("❌ No players registered yet.");
+ 
+    const statusMsg = await message.reply(`⏳ Assigning tier roles to **${players.length}** players... Please wait.`);
+ 
+    let assigned = 0;
+    let skipped  = 0;
+    let failed   = 0;
+ 
+    for (const player of players) {
+      try {
+        const discordMember = await guild.members.fetch(player.discordId).catch(() => null);
+        if (!discordMember) { skipped++; continue; }
+ 
+        await removeImmortalTierRoles(discordMember);
+ 
+        if (player.stars !== null && player.stars !== undefined && player.stars >= 100) {
+          const tier = getImmortalTier(player.stars);
+          if (tier) {
+            const tierRole = await getOrCreateRole(guild, tier.role, tier.color);
+            await discordMember.roles.add(tierRole);
+            assigned++;
+          }
+        } else {
+          skipped++;
+        }
+      } catch (err) {
+        console.error(`Failed for ${player.discordId}:`, err.message);
+        failed++;
+      }
+    }
+ 
+    return statusMsg.edit(`✅ Done!
+ 
+👑 Tier roles assigned: **${assigned}**
+⏭️ Skipped (below 100 stars or not in server): **${skipped}**
+❌ Failed: **${failed}**`);
   }
  
   // ── !leaderboard / !lb ──
