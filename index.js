@@ -1,8 +1,8 @@
 const { Client, GatewayIntentBits, Partials, EmbedBuilder } = require("discord.js");
 const { MongoClient } = require("mongodb");
- 
+
 // ─── CONFIG ────────────────────────────────────────────────────────────────────
- 
+
 const config = {
   token: process.env.BOT_TOKEN,
   mongoUri: process.env.MONGO_URI,
@@ -10,9 +10,9 @@ const config = {
   logChannelName: process.env.LOG_CHANNEL_NAME || "bot-logs",
   adminRoleName: process.env.ADMIN_ROLE_NAME || "Admin",
 };
- 
+
 // ─── MONGODB ───────────────────────────────────────────────────────────────────
- 
+
 let db;
 async function connectDB() {
   const client = new MongoClient(config.mongoUri, {
@@ -23,11 +23,11 @@ async function connectDB() {
   db = client.db("mlbb_bot");
   console.log("✅ Connected to MongoDB");
 }
- 
+
 async function getPlayer(discordId) {
   return db.collection("players").findOne({ discordId });
 }
- 
+
 async function savePlayer(data) {
   await db.collection("players").updateOne(
     { discordId: data.discordId },
@@ -35,17 +35,17 @@ async function savePlayer(data) {
     { upsert: true }
   );
 }
- 
+
 async function deletePlayer(discordId) {
   await db.collection("players").deleteOne({ discordId });
 }
- 
+
 async function getAllPlayers() {
   return db.collection("players").find().toArray();
 }
- 
+
 // ─── DISCORD CLIENT ────────────────────────────────────────────────────────────
- 
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -55,37 +55,37 @@ const client = new Client({
   ],
   partials: [Partials.Message, Partials.Channel],
 });
- 
+
 // ─── RANK & ROLE MAPS ──────────────────────────────────────────────────────────
- 
+
 const MYTHIC_TIERS = [
   { min: 100, max: Infinity, role: "Mythical Immortal", color: 0xFF0000, order: 10 },
   { min: 50,  max: 99,       role: "Mythical Glory",    color: 0xFFD700, order: 9  },
   { min: 25,  max: 49,       role: "Mythical Honor",    color: 0xFFA500, order: 8  },
   { min: 0,   max: 24,       role: "Mythic",            color: 0x9B59B6, order: 7  },
 ];
- 
+
 // Extra tiers for Mythical Immortal players only (100+ stars)
 const IMMORTAL_TIERS = [
   { min: 350, max: Infinity, role: "ELITE",    color: 0x00FFFF },
   { min: 200, max: 349,      role: "GOLD",     color: 0xFFD700 },
   { min: 100, max: 199,      role: "IMMORTAL", color: 0xFF4444 },
 ];
- 
+
 const ALL_IMMORTAL_TIER_ROLES = ["IMMORTAL", "GOLD", "ELITE"];
- 
+
 function getImmortalTier(stars) {
   if (stars === null || stars === undefined) return null;
   return IMMORTAL_TIERS.find((t) => stars >= t.min && stars <= t.max) || null;
 }
- 
+
 async function removeImmortalTierRoles(member) {
   for (const roleName of ALL_IMMORTAL_TIER_ROLES) {
     const role = member.roles.cache.find((r) => r.name === roleName);
     if (role) await member.roles.remove(role);
   }
 }
- 
+
 const NORMAL_RANKS = [
   { keywords: ["legend"],      role: "Legend",      color: 0x3498DB, order: 6 },
   { keywords: ["epic"],        role: "Epic",         color: 0x8E44AD, order: 5 },
@@ -94,12 +94,12 @@ const NORMAL_RANKS = [
   { keywords: ["elite"],       role: "Elite",        color: 0x1ABC9C, order: 2 },
   { keywords: ["warrior"],     role: "Warrior",      color: 0x95A5A6, order: 1 },
 ];
- 
+
 const ALL_RANK_ROLES = [
   "Mythical Immortal", "Mythical Glory", "Mythical Honor", "Mythic",
   "Legend", "Epic", "Grandmaster", "Master", "Elite", "Warrior",
 ];
- 
+
 const LANE_ROLES = [
   { keywords: ["exp laner", "exp lane", "exp"],    role: "EXP Laner"  },
   { keywords: ["gold laner", "gold lane", "gold"], role: "Gold Laner" },
@@ -107,9 +107,9 @@ const LANE_ROLES = [
   { keywords: ["mid laner", "mid lane", "mid"],    role: "Mid Laner"  },
   { keywords: ["roamer", "roam", "support"],       role: "Roamer"     },
 ];
- 
+
 // ─── HELPERS ───────────────────────────────────────────────────────────────────
- 
+
 function parseForm(content) {
   const lines = content.split("\n").map((l) => l.trim());
   let ingameId = null, serverId = null, role = null, rank = null, stars = null;
@@ -123,19 +123,19 @@ function parseForm(content) {
   }
   return { ingameId, serverId, role, rank, stars };
 }
- 
+
 function isMythicKeyword(value) {
   if (!value) return false;
   const lower = value.toLowerCase();
   return lower.includes("mythic") || lower.includes("immortal") ||
          lower.includes("glory")  || lower.includes("honor");
 }
- 
+
 function getRankFromStars(stars) {
   const num = parseInt(stars);
   return MYTHIC_TIERS.find((t) => num >= t.min && num <= t.max) || null;
 }
- 
+
 function matchNormalRank(value) {
   if (!value) return null;
   const lower = value.toLowerCase();
@@ -144,7 +144,7 @@ function matchNormalRank(value) {
   }
   return null;
 }
- 
+
 function matchLane(value) {
   if (!value) return null;
   const lower = value.toLowerCase();
@@ -153,14 +153,14 @@ function matchLane(value) {
   }
   return null;
 }
- 
+
 function isNumeric(value) { return /^\d+$/.test(value?.trim()); }
 function isLettersOnly(value) { return /^[a-zA-Z\s]+$/.test(value?.trim()); }
 function isAdmin(member) {
   return member.permissions.has("Administrator") ||
          member.roles.cache.some((r) => r.name === config.adminRoleName);
 }
- 
+
 async function getOrCreateRole(guild, roleName, color = 0x99AAB5) {
   let role = guild.roles.cache.find((r) => r.name === roleName);
   if (!role) {
@@ -169,26 +169,26 @@ async function getOrCreateRole(guild, roleName, color = 0x99AAB5) {
   }
   return role;
 }
- 
+
 async function removeOldRankRoles(member) {
   for (const roleName of ALL_RANK_ROLES) {
     const role = member.roles.cache.find((r) => r.name === roleName);
     if (role) await member.roles.remove(role);
   }
 }
- 
+
 async function removeOldLaneRoles(member) {
   for (const entry of LANE_ROLES) {
     const role = member.roles.cache.find((r) => r.name === entry.role);
     if (role) await member.roles.remove(role);
   }
 }
- 
+
 async function sendTempWarning(channel, user, text) {
   const warning = await channel.send(`${user}\n${text}`);
   setTimeout(() => warning.delete().catch(() => {}), 8000);
 }
- 
+
 // ─── LEADERBOARD SORT ──────────────────────────────────────────────────────────
 // Sort by rankOrder DESC, then by stars DESC (for same rank tier)
 function sortPlayers(players) {
@@ -199,43 +199,43 @@ function sortPlayers(players) {
     return starsB - starsA;
   });
 }
- 
+
 // ─── READY ─────────────────────────────────────────────────────────────────────
- 
+
 client.once("clientReady", () => {
   console.log(`✅ Bot online as ${client.user.tag}`);
   console.log(`📡 Watching: #${config.listenChannelName}`);
 });
- 
+
 // ─── MESSAGE ───────────────────────────────────────────────────────────────────
- 
+
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
- 
+
   const channel = message.channel;
   const member  = message.member;
   const guild   = message.guild;
   const user    = `<@${message.author.id}>`;
   const content = message.content.trim();
- 
+
   // ── ADMIN COMMANDS ──
   if (content.startsWith("!")) {
     await handleCommand(message, member, guild, channel, user, content);
     return;
   }
- 
+
   // ── REGISTRATION CHANNEL ONLY ──
   if (channel.name !== config.listenChannelName) return;
- 
+
   const { rank: rawRank } = parseForm(content);
   const mythic = isMythicKeyword(rawRank);
- 
+
   // ── STEP 1: Must have all required fields ──
   const lower = content.toLowerCase();
   const hasBase = lower.includes("ingame id:") && lower.includes("server id:") &&
                   lower.includes("role:") && lower.includes("rank:");
   const hasStars = lower.includes("stars:");
- 
+
   if (!hasBase || (mythic && !hasStars)) {
     await message.delete().catch(() => {});
     const format = mythic
@@ -246,9 +246,9 @@ client.on("messageCreate", async (message) => {
     );
     return;
   }
- 
+
   const { ingameId, serverId, role, rank, stars } = parseForm(content);
- 
+
   // ── STEP 2: All fields must be filled ──
   const baseFilled = ingameId?.length > 0 && serverId?.length > 0 &&
                      role?.length > 0 && rank?.length > 0;
@@ -259,7 +259,7 @@ client.on("messageCreate", async (message) => {
     );
     return;
   }
- 
+
   // ── STEP 3: Ingame ID and Server ID must be numbers ──
   if (!isNumeric(ingameId)) {
     await message.delete().catch(() => {});
@@ -268,7 +268,7 @@ client.on("messageCreate", async (message) => {
     );
     return;
   }
- 
+
   if (!isNumeric(serverId)) {
     await message.delete().catch(() => {});
     await sendTempWarning(channel, user,
@@ -276,7 +276,7 @@ client.on("messageCreate", async (message) => {
     );
     return;
   }
- 
+
   // ── STEP 4: Role and Rank must be letters ──
   if (!isLettersOnly(role)) {
     await message.delete().catch(() => {});
@@ -285,7 +285,7 @@ client.on("messageCreate", async (message) => {
     );
     return;
   }
- 
+
   if (!isLettersOnly(rank)) {
     await message.delete().catch(() => {});
     await sendTempWarning(channel, user,
@@ -293,10 +293,10 @@ client.on("messageCreate", async (message) => {
     );
     return;
   }
- 
+
   // ── STEP 5: Determine final rank entry ──
   let detectedRankEntry = null;
- 
+
   if (mythic) {
     detectedRankEntry = getRankFromStars(stars);
     if (!detectedRankEntry) {
@@ -316,7 +316,7 @@ client.on("messageCreate", async (message) => {
       return;
     }
   }
- 
+
   // ── STEP 6: Detect lane ──
   const detectedLaneEntry = matchLane(role);
   if (!detectedLaneEntry) {
@@ -326,7 +326,7 @@ client.on("messageCreate", async (message) => {
     );
     return;
   }
- 
+
   // ── STEP 7: Check if already registered ──
   const existing = await getPlayer(message.author.id);
   if (existing) {
@@ -336,19 +336,19 @@ client.on("messageCreate", async (message) => {
     );
     return;
   }
- 
+
   // ── STEP 8: Assign roles ──
   try {
     await removeOldRankRoles(member);
     const rankRole = await getOrCreateRole(guild, detectedRankEntry.role, detectedRankEntry.color);
     await member.roles.add(rankRole);
- 
+
     await removeOldLaneRoles(member);
     const laneRole = await getOrCreateRole(guild, detectedLaneEntry.role);
     await member.roles.add(laneRole);
- 
+
     const starsNum = stars ? parseInt(stars) : null;
- 
+
     // Assign IMMORTAL tier role if applicable
     await removeImmortalTierRoles(member);
     const immortalTier = getImmortalTier(starsNum);
@@ -356,7 +356,7 @@ client.on("messageCreate", async (message) => {
       const tierRole = await getOrCreateRole(guild, immortalTier.role, immortalTier.color);
       await member.roles.add(tierRole);
     }
- 
+
     // ── STEP 9: Save to MongoDB ──
     await savePlayer({
       discordId:    message.author.id,
@@ -370,7 +370,7 @@ client.on("messageCreate", async (message) => {
       lane:         detectedLaneEntry.role,
       registeredAt: new Date(),
     });
- 
+
     // ── STEP 10: Reply embed ──
     const fields = [
       { name: "🎮 Ingame ID", value: `\`${ingameId}\``, inline: true },
@@ -380,7 +380,7 @@ client.on("messageCreate", async (message) => {
       { name: "🗺️ Role",      value: detectedLaneEntry.role, inline: true },
     ];
     if (starsNum !== null) fields.push({ name: "⭐ Stars", value: `\`${starsNum}\``, inline: true });
- 
+
     const embed = new EmbedBuilder()
       .setColor(detectedRankEntry.color)
       .setTitle("✅ Registration Successful!")
@@ -388,9 +388,9 @@ client.on("messageCreate", async (message) => {
       .addFields(fields)
       .setTimestamp()
       .setFooter({ text: "MLBB Role Bot" });
- 
+
     await channel.send({ content: `<@${message.author.id}>`, embeds: [embed] });
- 
+
     // ── STEP 11: Log ──
     try {
       const logChannel = guild.channels.cache.find((c) => c.name === config.logChannelName);
@@ -403,7 +403,7 @@ client.on("messageCreate", async (message) => {
         { name: "🗺️ Role",      value: detectedLaneEntry.role, inline: true },
       ];
       if (starsNum !== null) logFields.push({ name: "⭐ Stars", value: `\`${starsNum}\``, inline: true });
- 
+
       await logChannel.send({ embeds: [
         new EmbedBuilder()
           .setColor(0x2ECC71)
@@ -415,46 +415,87 @@ client.on("messageCreate", async (message) => {
     } catch (logErr) {
       console.error("Log channel error:", logErr.message);
     }
- 
+
   } catch (err) {
     console.error("Error:", err.message);
     channel.send(`<@${message.author.id}> ⚠️ Something went wrong. Make sure I have **Manage Roles** permission!`).catch(() => {});
   }
 });
- 
+
 // ─── GLOBAL ERROR HANDLER ──────────────────────────────────────────────────────
 process.on("unhandledRejection", (err) => {
   console.error("Unhandled rejection:", err.message);
 });
- 
+
 // ─── ADMIN COMMANDS ────────────────────────────────────────────────────────────
- 
+
 async function handleCommand(message, member, guild, channel, user, content) {
   const args    = content.slice(1).trim().split(/\s+/);
   const command = args[0].toLowerCase();
- 
+
   // ── !resetroles @user ──
   if (command === "resetroles") {
     if (!isAdmin(member)) return message.reply("❌ You don't have permission to use this command.");
     const target = message.mentions.members.first();
     if (!target) return message.reply("❌ Please mention a user. Example: `!resetroles @user`");
- 
+
     await removeOldRankRoles(target);
     await removeOldLaneRoles(target);
+    await removeImmortalTierRoles(target);
     await deletePlayer(target.id);
- 
+
     return message.reply(`✅ Removed all MLBB roles from **${target.displayName}**. They can now re-register.`);
   }
- 
+
+  // ── !resetallroles ──
+  if (command === "resetallroles") {
+    if (!isAdmin(member)) return message.reply("❌ You don't have permission to use this command.");
+
+    const players = await getAllPlayers();
+    if (players.length === 0) return message.reply("❌ No players registered yet.");
+
+    const statusMsg = await message.reply(`⏳ Resetting roles for **${players.length}** players... Please wait.`);
+
+    let reset  = 0;
+    let missed = 0;
+    let failed = 0;
+
+    for (const player of players) {
+      try {
+        const discordMember = await guild.members.fetch(player.discordId).catch(() => null);
+        if (discordMember) {
+          await removeOldRankRoles(discordMember);
+          await removeOldLaneRoles(discordMember);
+          await removeImmortalTierRoles(discordMember);
+          reset++;
+        } else {
+          missed++;
+        }
+        await deletePlayer(player.discordId);
+      } catch (err) {
+        console.error(`Failed for ${player.discordId}:`, err.message);
+        failed++;
+      }
+    }
+
+    return statusMsg.edit(`✅ Done!
+
+🔄 Roles reset: **${reset}**
+⏭️ Not in server (DB entry still cleared): **${missed}**
+❌ Failed: **${failed}**
+
+All players have been unregistered and can now re-register.`);
+  }
+
   // ── !whois @user ──
   if (command === "whois") {
     if (!isAdmin(member)) return message.reply("❌ You don't have permission to use this command.");
     const target = message.mentions.members.first();
     if (!target) return message.reply("❌ Please mention a user. Example: `!whois @user`");
- 
+
     const player = await getPlayer(target.id);
     if (!player) return message.reply(`❌ **${target.displayName}** is not registered.`);
- 
+
     const fields = [
       { name: "🎮 Ingame ID", value: `\`${player.ingameId}\``, inline: true },
       { name: "🌐 Server ID", value: `\`${player.serverId}\``, inline: true },
@@ -466,7 +507,7 @@ async function handleCommand(message, member, guild, channel, user, content) {
       fields.push({ name: "⭐ Stars", value: `\`${player.stars}\``, inline: true });
     }
     fields.push({ name: "📅 Registered", value: new Date(player.registeredAt).toDateString(), inline: false });
- 
+
     return message.reply({ embeds: [
       new EmbedBuilder()
         .setColor(0x3498DB)
@@ -475,30 +516,30 @@ async function handleCommand(message, member, guild, channel, user, content) {
         .setTimestamp()
     ]});
   }
- 
+
   // ── !stats ──
   if (command === "stats") {
     if (!isAdmin(member)) return message.reply("❌ You don't have permission to use this command.");
- 
+
     const players = await getAllPlayers();
     const rankCounts = {};
     const laneCounts = {};
- 
+
     for (const p of players) {
       rankCounts[p.rank] = (rankCounts[p.rank] || 0) + 1;
       laneCounts[p.lane] = (laneCounts[p.lane] || 0) + 1;
     }
- 
+
     const rankStats = [...MYTHIC_TIERS, ...NORMAL_RANKS]
       .filter((r) => rankCounts[r.role])
       .map((r) => `${r.role}: **${rankCounts[r.role]}**`)
       .join("\n") || "No data";
- 
+
     const laneStats = LANE_ROLES
       .filter((r) => laneCounts[r.role])
       .map((r) => `${r.role}: **${laneCounts[r.role]}**`)
       .join("\n") || "No data";
- 
+
     return message.reply({ embeds: [
       new EmbedBuilder()
         .setColor(0x9B59B6)
@@ -511,27 +552,27 @@ async function handleCommand(message, member, guild, channel, user, content) {
         .setTimestamp()
     ]});
   }
- 
+
   // ── !assigntiers (migration for existing players) ──
   if (command === "assigntiers") {
     if (!isAdmin(member)) return message.reply("❌ You don't have permission to use this command.");
- 
+
     const players = await getAllPlayers();
     if (players.length === 0) return message.reply("❌ No players registered yet.");
- 
+
     const statusMsg = await message.reply(`⏳ Assigning tier roles to **${players.length}** players... Please wait.`);
- 
+
     let assigned = 0;
     let skipped  = 0;
     let failed   = 0;
- 
+
     for (const player of players) {
       try {
         const discordMember = await guild.members.fetch(player.discordId).catch(() => null);
         if (!discordMember) { skipped++; continue; }
- 
+
         await removeImmortalTierRoles(discordMember);
- 
+
         if (player.stars !== null && player.stars !== undefined && player.stars >= 100) {
           const tier = getImmortalTier(player.stars);
           if (tier) {
@@ -547,28 +588,28 @@ async function handleCommand(message, member, guild, channel, user, content) {
         failed++;
       }
     }
- 
+
     return statusMsg.edit(`✅ Done!
- 
+
 👑 Tier roles assigned: **${assigned}**
 ⏭️ Skipped (below 100 stars or not in server): **${skipped}**
 ❌ Failed: **${failed}**`);
   }
- 
+
   // ── !leaderboard / !lb ──
   if (command === "leaderboard" || command === "lb") {
     const players = await getAllPlayers();
     if (players.length === 0) return message.reply("❌ No players registered yet.");
- 
+
     const sorted = sortPlayers(players).slice(0, 10);
     const medals = ["🥇", "🥈", "🥉"];
- 
+
     const list = sorted.map((p, i) => {
       const medal  = medals[i] || `**${i + 1}.**`;
       const stars  = p.stars !== null && p.stars !== undefined ? ` · ⭐ ${p.stars}` : "";
       return `${medal} <@${p.discordId}> — ${p.rank}${stars} / ${p.lane}`;
     }).join("\n");
- 
+
     return message.reply({ embeds: [
       new EmbedBuilder()
         .setColor(0xFFD700)
@@ -579,9 +620,9 @@ async function handleCommand(message, member, guild, channel, user, content) {
     ]});
   }
 }
- 
+
 // ─── START ─────────────────────────────────────────────────────────────────────
- 
+
 connectDB().then(() => {
   client.login(config.token);
 }).catch((err) => {
